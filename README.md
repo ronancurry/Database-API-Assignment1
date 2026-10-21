@@ -126,8 +126,3 @@ Order ID | Customer     | Product   | Quantity | Unit Price | Total  | Order Dat
 Enter another order? (Y/N): n
 Goodbye.
 ```
-
-## References
-
-- `decimal.Decimal`: https://docs.python.org/3/library/decimal.html
-- `unittest.mock` (used in `tests/`): https://docs.python.org/3/library/unittest.mock.html
