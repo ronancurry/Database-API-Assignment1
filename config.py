@@ -1,6 +1,7 @@
 """Read configuration without printing credentials."""
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 
@@ -10,6 +11,6 @@ def get_settings():
     key = os.getenv("SUPABASE_SECRET_KEY", "").strip()
     if not url.startswith("https://") or "YOUR_PROJECT" in url:
         raise ValueError("Set your project HTTPS URL in .env (not the dashboard URL).")
-    if not key.startswith("sb_secret_"):
-        raise ValueError("Set SUPABASE_SECRET_KEY to your own project's sb_secret_ key.")
+    if not key.startswith("sb_secret_") or "replace_with" in key:
+        raise ValueError("Set SUPABASE_SECRET_KEY to your own project's sb_secret_ key in .env.")
     return url, key

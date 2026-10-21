@@ -1,207 +1,184 @@
-# DATA 4000 — Python + Supabase API Lab
-Fairfield University · Illya Mowerman, Ph.D.
+# Customer Order Entry
 
-## Start here
-Build a fictional campus store database, upload CSV records with Python, and use
-an API to read and change records. Plan for 75–90 minutes with accounts created
-before class. Python fundamentals (functions, lists, dictionaries, imports) are assumed.
-Use Python 3.11 or newer and VS Code. No actual customer data is used.
+This is my DATA 4000 Database API assignment. It's a Python program that runs in the terminal and lets you create orders for existing customers in our Supabase database. After it saves an order, it queries Supabase again to make sure the order was actually saved.
 
-## What is happening?
-Python reads CSV text into dictionaries. The Supabase Python library sends those
-dictionaries as JSON over HTTPS to Supabase's Data API. The API reads/writes
-PostgreSQL tables and sends JSON back. `.execute()` triggers a request; `.data`
-contains the returned Python records. This lab does NOT use a PostgreSQL connection
-string, database password, or Django ORM.
+## What the program does
 
-CSV → Python → HTTPS Data API → Supabase PostgreSQL.
-Later: Streamlit widget or Django view → the same Python functions → Data API.
+When you run `order_entry.py`, this is what happens:
 
-## Files and order
-| File | Purpose |
-|---|---|
-| data/customers.csv | 20 fictional customers |
-| data/products.csv | 12 products |
-| data/orders.csv | 60 one-product orders |
-| sql/01_create_tables.sql | Tables, constraints, and restricted access |
-| config.py | Read local configuration |
-| database.py | Reusable API functions |
-| 01_check_connection.py | Check access before uploading |
-| 02_import_data.py | Validate and upload CSV records |
-| 03_query_data.py | Read, filter, join, calculate revenue |
-| 04_modify_data.py | Insert, update, delete demonstration |
-| 05_raw_api.py | Optional HTTP request without the client library |
-| app_streamlit.py | Optional local application bridge |
-| exercises.py / solutions.py | Student practice and worked answers |
-| EXPECTED_RESULTS.md | Baseline results for verification |
-| INSTRUCTOR_GUIDE.md | Lesson flow and discussion prompts |
+1. It pulls the customers and products from Supabase and prints them as two tables, with prices shown to two decimal places.
+2. It asks for a customer ID, a product ID, and a quantity. If something isn't valid, it explains what's wrong and asks again.
+3. It shows an order summary (customer, product, quantity, current unit price, and total) and asks you to confirm with Y or N.
+4. If you type **N**, the order is cancelled and nothing gets inserted. If you type **Y**, the order is inserted through the Supabase API using today's date and the product's current price from the database. The database creates the order ID.
+5. It takes the order ID that came back from the insert and sends a **new query** to Supabase to look up that order, then prints it in a table. If that lookup fails or comes back empty, it says verification couldn't be completed, and it doesn't try to insert the order again.
+6. It asks if you want to enter another order and keeps going until you say N (this is the extra credit).
 
-## 1. Create your own Supabase project
-Create a dedicated classroom project at https://supabase.com/dashboard and wait
-for it to finish provisioning. Each student should use their own project. Do not
-share the instructor's administrative credentials with students.
-Open SQL Editor, paste sql/01_create_tables.sql, and run it once.
-The script creates public.customers, public.products, and public.orders.
-Check Table Editor: all three tables should exist and initially be empty.
-If you already have tables with these names, use a new project; this script does
-not overwrite them. SQL defines the structure; the later Python script loads data.
-Ensure the Data API is enabled and the public schema is exposed in project API settings.
+You never have to type in a price or an order ID. Those come from the database.
 
-## 2. Open the extracted folder in VS Code
-Open the whole supabase_class folder, then open its terminal.
-Create a virtual environment:
+## Setup
 
-macOS / Linux:
+I used Python 3.11 or newer. In the project folder, make a virtual environment, activate it, install the packages, and copy the environment template:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
 ```
-Windows PowerShell:
-```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-```
-If PowerShell blocks activation, use `.\.venv\Scripts\python.exe` in place
-of `python` for installation and scripts; activation is not essential.
-In VS Code use Python: Select Interpreter and choose the .venv interpreter.
-Dependencies use compatible major-version ranges, not a fully locked environment.
 
-## 3. Set configuration
-In Supabase, find your project URL in the Connect dialog and a secret API key in
-Settings → API Keys. Create a secret key if needed. Edit the local .env file:
+On Windows PowerShell it's `py -m venv .venv`, then `.\.venv\Scripts\Activate.ps1` to activate, and `Copy-Item .env.example .env` to copy the template.
+
+Next, open `.env` and put in your own Supabase project URL and secret key:
+
 ```dotenv
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=sb_secret_your_actual_key
+SUPABASE_SECRET_KEY=sb_secret_your_own_key
 ```
-Use the project API URL, not the browser dashboard address. The secret key is not
-the database password. This kit expects the current sb_secret_ key format.
 
-This is a private, local administrative exercise: each person uses their own
-secret key. Row Level Security is enabled, with no public access policies, and
-anon/authenticated table privileges are revoked. The secret key uses service_role,
-which bypasses RLS. A publishable key therefore cannot substitute for this key.
-Never put .env in GitHub, slides, screenshots, AI prompts, or student submissions.
-The included .gitignore excludes it. If exposed, rotate the key in Supabase.
+Your Supabase project needs the `customers`, `products`, and `orders` tables, and the Data API has to be turned on. The `.env` file is in `.gitignore`, so my real keys never get uploaded. Only `.env.example` is in the repo, and it just has placeholders.
 
-## 4. Validate, connect, and upload
+## How to run it
+
+With the virtual environment activated, run this from the project folder:
+
 ```bash
-python 02_import_data.py --check-only
-python 01_check_connection.py
-python 02_import_data.py
-python 01_check_connection.py
+python order_entry.py
 ```
-The offline check does not need packages or credentials. Expect 20 customers,
-12 products, and 60 orders. The connection check reports 0 products before import
-and 12 afterward. Refresh Table Editor to see the records.
-The loader converts CSV strings to integers where required and validates keys,
-quantities, dates, and prices before calling the API. Prices are sent as decimal
-strings and stored as PostgreSQL numeric values.
 
-Customers and products must load before orders because orders contain foreign keys.
-The loader uses upsert: an existing primary key is updated, otherwise inserted.
-Re-running restores the seeded values, including catalog prices. It does not remove
-extra records created during exercises. Uploads are three separate requests, not
-one all-or-nothing transaction. If a request fails, fix the issue and rerun.
+I also wrote some automated tests. They use a fake API client, so they don't change anything in Supabase. To run them:
 
-## 5. Query and modify
 ```bash
-python 03_query_data.py
-python 04_modify_data.py
-python 05_raw_api.py
+python -m unittest discover -s tests -v
 ```
-Read database.py beside each example. The modify script requires typing YES,
-adds one fictional demo customer, changes a product price, creates/deletes one
-order, and restores the product price in a finally block. An abrupt process stop
-can leave partial changes: inspect the tables and rerun the importer to restore
-seed prices. Additional demo customers are intentionally retained.
-Use an equality filter for every targeted update/delete. A foreign key prevents
-an order from referring to a nonexistent customer or product.
 
-The raw HTTP example returns status 200 and a JSON list. Its apikey request header
-identifies the calling component. The library normally handles HTTP details for us.
+## Testing results
 
-## 6. Practice
-Read exercises.py, complete the TODOs, and run:
-```bash
-python exercises.py
-```
-Use solutions.py after attempting the exercises. Run baseline comparisons before
-adding orders. See EXPECTED_RESULTS.md.
-
-## 7. Optional Streamlit bridge
-```bash
-python -m pip install -r requirements-app.txt
-python -m streamlit run app_streamlit.py --server.address 127.0.0.1
-```
-Open the local address printed in the terminal. The app shows the product catalog,
-records purchases, and reads saved orders using database.py. Every successful
-submission creates a new order. This is an unauthenticated LOCAL admin demo;
-do not publish it as-is. Server-held credentials do not by themselves authorize
-visitors to change data. Before public deployment add user authentication and
-per-user authorization, with appropriately scoped RLS policies and user sessions,
-or a carefully authorized backend. Store deployment secrets in the hosting
-platform's secret manager.
-
-For Django, a view can import `get_products` or `create_order` from database.py.
-A POST form needs Django CSRF protection, input validation, authentication, and
-authorization before calling write functions. Using this API approach is different
-from configuring Django's PostgreSQL ORM. A full Django project is a later lesson.
-
-## Data dictionary and design
-| Table | Column | Type / meaning |
+| Test | Expected behavior | Result |
 |---|---|---|
-| customers | customer_id | Integer primary key |
-| customers | name, email, city | Text; email is unique |
-| products | product_id | Integer primary key |
-| products | product_name, category | Text |
-| products | price | Current catalog price, dollars, 2 decimals |
-| orders | order_id | Integer primary key |
-| orders | customer_id, product_id | Foreign keys to the parent tables |
-| orders | quantity | Positive integer |
-| orders | order_date | ISO date YYYY-MM-DD |
-| orders | unit_price | Price per unit at purchase time |
+| Enter text (`hello`) instead of a customer ID | Helpful message; asks again | Passed. Printed "Please enter a whole-number ID." and asked again |
+| Enter a customer ID that does not exist | Rejects the ID; asks again | Passed. Printed "That customer ID is not in the list. Please try again." |
+| Enter a product ID that does not exist | Rejects the ID; asks again | Passed. Printed "That product ID is not in the list. Please try again." |
+| Enter quantity `0`, `-2`, `1.5`, `hello` | Rejects each value; asks again | Passed. `0` and `-2` printed "Quantity must be greater than zero."; `1.5` and `hello` printed "Please enter a positive whole number…" |
+| Cancel at the confirmation prompt | No order is inserted | Passed. Printed "Order cancelled; nothing was inserted." and no insert request was sent |
+| Confirm a valid order | Exactly one order is inserted | Passed. One insert request, then "Order saved. Supabase assigned order ID …" |
+| Retrieve the newly created order | Saved order appears in the verification table | Passed. A separate query by order ID found the saved order and showed it in the table |
 
-One customer can have many orders; one product can appear in many orders.
-Each order contains ONE product, possibly multiple units. A full shopping cart
-would usually separate orders from order_items, adding a fourth table.
-Seed IDs are below 1000; generated IDs start at 1000 to avoid sequence collisions
-when new rows are inserted. All names are fictional and emails use example.com.
-The data is fixed, reproducible, and dated September 2026.
+All 10 automated tests in `tests/test_order_entry.py` pass. They cover every case above, plus two failure cases: when the insert fails (no success message is shown), and when the verification lookup fails (the program reports it and doesn't insert the order again).
 
-## Scope of the teaching example
-The read functions use one API response. Supabase commonly limits responses to
-1000 records; use pagination for larger datasets. Revenue is labeled as the total
-of returned rows. Recording an order reads a product price and then inserts the
-order in separate requests. A production checkout should enforce authoritative
-pricing, inventory, and atomicity in a database function/transaction. This lesson
-has no payments, inventory, taxes, shipping, or production checkout guarantees.
+### Live run (successful insertion and verification)
 
-## Troubleshooting
-| Symptom | What to check |
-|---|---|
-| ModuleNotFoundError | Install requirements with the same Python interpreter running the script. |
-| Configuration ValueError | .env must sit beside config.py; replace both placeholders. Existing shell environment variables take precedence. |
-| HTTP 401 / invalid API key | URL and secret key must belong to the same project; check key status. |
-| Permission denied / empty public reads | Use your own secret key for this lab; public access is intentionally restricted. |
-| Table not found / schema cache | Run SQL first, confirm public schema is exposed, then retry after the schema cache refreshes. |
-| Foreign-key error | Upload parents first; customer/product IDs must exist. |
-| Unique email error | Choose a new fictional email or inspect the existing customer. |
-| Relation already exists | Setup SQL was already run; skip it or use a new project. |
-| Counts exceed baseline | Demo customers or app orders remain; seed upsert does not delete them. |
-| Network / project unavailable | Check internet access and that the Supabase project is running. |
+This is the output from one real run of `python order_entry.py` on 2026-10-21. In it I try each kind of bad input, cancel one order, and then confirm a second order that gets inserted and looked up again with a separate query. No credentials show up anywhere in the output.
 
-## Reference documentation
-API syntax and key guidance checked October 14, 2026:
-- https://supabase.com/docs/reference/python/initializing
-- https://supabase.com/docs/reference/python/select
-- https://supabase.com/docs/reference/python/insert
-- https://supabase.com/docs/reference/python/upsert
-- https://supabase.com/docs/guides/getting-started/api-keys
+```text
 
-Validation: CSV relationships and totals and Python syntax checked locally.
-A live Supabase round-trip requires your project and credentials and was not run
-when this kit was created. Run the connection/import checks before class.
+Customers
+Customer ID | Customer Name
+------------+--------------
+1           | Avery Morgan 
+2           | Jordan Patel 
+3           | Taylor Chen  
+4           | Casey Rivera 
+5           | Riley Brooks 
+6           | Morgan Lee   
+7           | Jamie Wilson 
+8           | Alex Kim     
+9           | Cameron Davis
+10          | Quinn Garcia 
+11          | Sam Parker   
+12          | Drew Johnson 
+13          | Skyler Reed  
+14          | Reese Martin 
+15          | Rowan Lewis  
+16          | Peyton Clark 
+17          | Finley Hall  
+18          | Emerson Young
+19          | Dakota Allen 
+20          | Harper Scott 
+
+Products
+Product ID | Product Name   | Current Price
+-----------+----------------+--------------
+1          | Notebook       | $4.50        
+2          | Pen Set        | $6.00        
+3          | Backpack       | $45.00       
+4          | Water Bottle   | $18.00       
+5          | Hoodie         | $39.00       
+6          | T-Shirt        | $19.00       
+7          | USB Drive      | $12.50       
+8          | Wireless Mouse | $24.00       
+9          | Desk Lamp      | $29.00       
+10         | Coffee Mug     | $10.00       
+11         | Planner        | $15.00       
+12         | Laptop Stand   | $35.00       
+Enter customer ID: hello
+Please enter a whole-number ID.
+Enter customer ID: 999
+That customer ID is not in the list. Please try again.
+Enter customer ID: 1
+Enter product ID: 999
+That product ID is not in the list. Please try again.
+Enter product ID: 3
+Enter quantity: 0
+Quantity must be greater than zero.
+Enter quantity: -2
+Quantity must be greater than zero.
+Enter quantity: 1.5
+Please enter a positive whole number, such as 1 or 2.
+Enter quantity: hello
+Please enter a positive whole number, such as 1 or 2.
+Enter quantity: 2
+
+Order summary
+Customer: Avery Morgan
+Product: Backpack
+Quantity: 2
+Current unit price: $45.00
+Order total: $90.00
+Confirm this purchase? (Y/N): maybe
+Please enter Y or N.
+Confirm this purchase? (Y/N): n
+Order cancelled; nothing was inserted.
+
+Enter another order? (Y/N): y
+Enter customer ID: 2
+Enter product ID: 7
+Enter quantity: 3
+
+Order summary
+Customer: Jordan Patel
+Product: USB Drive
+Quantity: 3
+Current unit price: $12.50
+Order total: $37.50
+Confirm this purchase? (Y/N): y
+
+Order saved. Supabase assigned order ID 1001.
+
+Saved order retrieved from Supabase:
+Order ID | Customer     | Product   | Quantity | Unit Price | Total  | Order Date
+---------+--------------+-----------+----------+------------+--------+-----------
+1001     | Jordan Patel | USB Drive | 3        | $12.50     | $37.50 | 2026-10-21
+
+Enter another order? (Y/N): n
+Goodbye.
+```
+
+Afterwards I checked the `orders` table. Order 1001 was the only new row, and the Backpack order I cancelled was never inserted.
+
+## Files
+
+- `order_entry.py`: the main order entry program
+- `database.py`: Supabase client and helper functions for customers and products (given in class)
+- `config.py`: loads the URL and key from `.env` (given in class)
+- `requirements.txt`: the Python packages you need
+- `.env.example`: a template with placeholder credentials
+- `.gitignore`: keeps `.env` and other local files out of Git
+- `tests/`: automated tests for input checks, saving, and verification
+
+## References
+
+A few things I used that weren't covered in class:
+
+- `decimal.Decimal`, so money math is exact instead of using floats: https://docs.python.org/3/library/decimal.html
+- `unittest` and `unittest.mock`, for testing with a fake API client: https://docs.python.org/3/library/unittest.html and https://docs.python.org/3/library/unittest.mock.html
+- Getting the new order ID back from the insert with `.insert(...).select("order_id")`, and pulling in related tables with `customers(name)`: https://supabase.com/docs/reference/python/insert and https://supabase.com/docs/reference/python/select
