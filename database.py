@@ -64,11 +64,45 @@ def create_order(customer_id, product_id, quantity):
     return response.data[0]
 
 
+def get_product(product_id):
+    products = (get_client().table("products").select("*")
+                .eq("product_id", int(product_id)).execute().data)
+    if not products:
+        raise ValueError("Product not found.")
+    return products[0]
+
+
+def insert_order_at_price(customer_id, product_id, quantity, unit_price):
+    if type(quantity) is not int or quantity <= 0:
+        raise ValueError("Quantity must be a positive integer.")
+    price = Decimal(str(unit_price))
+    if not price.is_finite() or price < 0:
+        raise ValueError("Product price is invalid.")
+    response = get_client().table("orders").insert({
+        "customer_id": int(customer_id), "product_id": int(product_id),
+        "quantity": quantity, "order_date": date.today().isoformat(),
+        "unit_price": str(price),
+    }).select("order_id").execute()
+    if not response.data or response.data[0].get("order_id") is None:
+        raise RuntimeError("The API did not return the generated order ID.")
+    return response.data[0]["order_id"]
+
+
 def get_orders():
     # Foreign keys let the API embed the related records in one response.
     return (get_client().table("orders")
             .select("*, customers(name, city), products(product_name)")
             .order("order_id").execute().data)
+
+
+def get_order(order_id):
+    orders = (get_client().table("orders")
+              .select("order_id, customer_id, product_id, quantity, unit_price, order_date, "
+                      "customers(name), products(product_name)")
+              .eq("order_id", int(order_id)).execute().data)
+    if not orders:
+        raise LookupError("The saved order was not returned by the verification query.")
+    return orders[0]
 
 
 def delete_order(order_id):

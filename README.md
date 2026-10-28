@@ -1,8 +1,8 @@
-# Customer Order Entry
+# Customer Order Desk
 
-A terminal program that creates customer orders in Supabase and then queries the database again to verify each order was saved.
+A password-gated Streamlit order-entry app for the fictional classroom Supabase database. It displays the live customer and product catalogs, saves confirmed orders, retrieves each saved order in a separate verification query, and shows order history with an optional customer filter.
 
-## Setup
+## Run Locally
 
 ```bash
 python3 -m venv .venv
@@ -11,118 +11,53 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Then put your own Supabase URL and secret key in `.env`.
-
-## Run
+Set `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and a private `APP_PASSWORD` in `.env`, then run:
 
 ```bash
-python order_entry.py
+streamlit run app.py
 ```
 
-## Testing results
+The local `.env` file is ignored by Git. Never put a real key or app password in `.env.example`, source code, screenshots, or a commit.
 
-| Test | Result |
-|---|---|
-| Text instead of a customer ID | Passed. Shows a message and asks again |
-| Customer ID that doesn't exist | Passed. Rejected and asks again |
-| Product ID that doesn't exist | Passed. Rejected and asks again |
-| Quantity `0`, `-2`, `1.5`, `hello` | Passed. Each one rejected and asks again |
-| Cancel at confirmation | Passed. No order inserted |
-| Confirm a valid order | Passed. Exactly one order inserted (ID 1001) |
-| Retrieve the new order | Passed. Order 1001 shown in the verification table |
+## Streamlit Community Cloud
 
-Output from a live run:
+1. Push the required source files to your GitHub repository.
+2. In Streamlit Community Cloud, create an app from that repository and select the `main` branch and `app.py` entry point.
+3. Add these values in the app's secrets settings, using a newly rotated Supabase secret if the previous key was exposed:
 
-```text
-
-Customers
-Customer ID | Customer Name
-------------+--------------
-1           | Avery Morgan 
-2           | Jordan Patel 
-3           | Taylor Chen  
-4           | Casey Rivera 
-5           | Riley Brooks 
-6           | Morgan Lee   
-7           | Jamie Wilson 
-8           | Alex Kim     
-9           | Cameron Davis
-10          | Quinn Garcia 
-11          | Sam Parker   
-12          | Drew Johnson 
-13          | Skyler Reed  
-14          | Reese Martin 
-15          | Rowan Lewis  
-16          | Peyton Clark 
-17          | Finley Hall  
-18          | Emerson Young
-19          | Dakota Allen 
-20          | Harper Scott 
-
-Products
-Product ID | Product Name   | Current Price
------------+----------------+--------------
-1          | Notebook       | $4.50        
-2          | Pen Set        | $6.00        
-3          | Backpack       | $45.00       
-4          | Water Bottle   | $18.00       
-5          | Hoodie         | $39.00       
-6          | T-Shirt        | $19.00       
-7          | USB Drive      | $12.50       
-8          | Wireless Mouse | $24.00       
-9          | Desk Lamp      | $29.00       
-10         | Coffee Mug     | $10.00       
-11         | Planner        | $15.00       
-12         | Laptop Stand   | $35.00       
-Enter customer ID: hello
-Please enter a whole-number ID.
-Enter customer ID: 999
-That customer ID is not in the list. Please try again.
-Enter customer ID: 1
-Enter product ID: 999
-That product ID is not in the list. Please try again.
-Enter product ID: 3
-Enter quantity: 0
-Quantity must be greater than zero.
-Enter quantity: -2
-Quantity must be greater than zero.
-Enter quantity: 1.5
-Please enter a positive whole number, such as 1 or 2.
-Enter quantity: hello
-Please enter a positive whole number, such as 1 or 2.
-Enter quantity: 2
-
-Order summary
-Customer: Avery Morgan
-Product: Backpack
-Quantity: 2
-Current unit price: $45.00
-Order total: $90.00
-Confirm this purchase? (Y/N): maybe
-Please enter Y or N.
-Confirm this purchase? (Y/N): n
-Order cancelled; nothing was inserted.
-
-Enter another order? (Y/N): y
-Enter customer ID: 2
-Enter product ID: 7
-Enter quantity: 3
-
-Order summary
-Customer: Jordan Patel
-Product: USB Drive
-Quantity: 3
-Current unit price: $12.50
-Order total: $37.50
-Confirm this purchase? (Y/N): y
-
-Order saved. Supabase assigned order ID 1001.
-
-Saved order retrieved from Supabase:
-Order ID | Customer     | Product   | Quantity | Unit Price | Total  | Order Date
----------+--------------+-----------+----------+------------+--------+-----------
-1001     | Jordan Patel | USB Drive | 3        | $12.50     | $37.50 | 2026-10-21
-
-Enter another order? (Y/N): n
-Goodbye.
+```toml
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_SECRET_KEY = "your-supabase-secret-key"
+APP_PASSWORD = "a-private-classroom-password"
 ```
+
+4. Deploy the app, open the hosted URL, and test it while signed in with the app password. Give the instructor the app password privately through the course submission system.
+5. Update the links and testing results below after the hosted app is deployed and verified.
+
+Do not commit `.env`, `.streamlit/secrets.toml`, or real credentials. The app checks its password before making any database request; this shared classroom password is not a production login system.
+
+## Submission Links
+
+- Hosted application: Not deployed yet
+- GitHub repository: https://github.com/ronancurry/Database-API-Assignment1
+
+Replace the hosted application status with the working Streamlit Community Cloud URL after deployment. Verify both links and instructor access before submitting.
+
+## Tests
+
+Run the local unit tests with:
+
+```bash
+python -m unittest discover -v
+```
+
+The automated tests exercise local validation and mocked API calls. They do not replace the required deployed-app tests. After deployment, verify authorized access, live catalog data, invalid quantity handling, refusal to save without confirmation, one successful confirmed order, fresh verification, no duplicate on rerun, refreshed order history, and the customer filter. Record the actual results here and include screenshots of the hosted order form and a genuinely verified order; do not use fabricated test data or screenshots.
+
+## How It Works
+
+- `app.py` collects a customer, product, and positive whole-number quantity. It shows a review, then asks for a separate explicit confirmation.
+- At confirmation, it fetches the selected product again. A changed price updates the review and requires a fresh confirmation.
+- `database.py` sends requests through the Supabase Python client. It stores the current price and date, lets the database generate the order ID, then retrieves that ID in a new API query.
+- `config.py` reads local `.env` values or Streamlit secrets. Credentials are not hard-coded in the repository.
+
+The app depends on Streamlit, pandas, python-dotenv, and the Supabase Python client. Streamlit reruns the script on interaction; inserts occur only on the explicit confirmation form submission, and the pending order is cleared after an insert attempt to avoid an automatic retry.
