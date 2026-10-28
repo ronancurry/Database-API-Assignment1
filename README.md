@@ -38,10 +38,10 @@ Do not commit `.env`, `.streamlit/secrets.toml`, or real credentials. The app ch
 
 ## Submission Links
 
-- Hosted application: Not deployed yet
+- Streamlit app: https://database-api-assignment1-jexeeqhzefmdvsbu4jx96y.streamlit.app/
+
 - GitHub repository: https://github.com/ronancurry/Database-API-Assignment1
 
-Replace the hosted application status with the working Streamlit Community Cloud URL after deployment. Verify both links and instructor access before submitting.
 
 ## Tests
 
